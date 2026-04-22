@@ -52,6 +52,16 @@ export function useHistory() {
     [history, persist]
   );
 
+  const addReading = useCallback(
+    async (reading) => {
+      const normalized = normalizeEntry(reading, 0);
+      const next = [normalized, ...history].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      await persist(next);
+      return normalized;
+    },
+    [history, persist]
+  );
+
   const stats = useMemo(() => {
     const total = history.length;
     const avg = total ? history.reduce((sum, item) => sum + Number(item.fusionScore || 0), 0) / total : 0;
@@ -64,6 +74,7 @@ export function useHistory() {
     loading,
     loadHistory,
     deleteReading,
+    addReading,
     stats,
   };
 }

@@ -1,122 +1,138 @@
-import { useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Slider from "@react-native-community/slider";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import * as Notifications from "expo-notifications";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { RectButton } from "react-native-gesture-handler";
+import { useFocusEffect } from "@react-navigation/native";
 import { theme } from "../theme";
+import { getAlertHistory, saveAlertHistory } from "../services/alerts";
 
-const KEY = "aquatrack_alert_settings";
-const defaults = {
-  enabled: true,
-  highRiskAlert: true,
-  risingTrend: true,
-  dailyReminder: false,
-  morningCheckIn: true,
-  threshold: 0.65,
-  reminderTime: new Date().toISOString(),
+const colorByLevel = {
+  critical: "#7f1d1d",
+  warning: "#78350f",
+  info: "#1e3a8a",
 };
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-const ToggleRow = ({ label, value, onValueChange }) => (
-  <View style={styles.row}>
-    <Text style={styles.rowLabel}>{label}</Text>
-    <Switch value={value} onValueChange={onValueChange} trackColor={{ true: theme.colors.cyan }} />
-  </View>
-);
-
 export default function AlertsScreen() {
-  const [settings, setSettings] = useState(defaults);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     (async () => {
-      const raw = await AsyncStorage.getItem(KEY);
-      if (raw) setSettings({ ...defaults, ...JSON.parse(raw) });
-      await Notifications.requestPermissionsAsync();
+      const loaded = await getAlertHistory();
+      setAlerts(loaded);
     })();
   }, []);
 
-  const persist = async (next) => {
-    setSettings(next);
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const loaded = await getAlertHistory();
+        setAlerts(loaded);
+      })();
+    }, [])
+  );
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return alerts;
+    return alerts.filter((item) => item.level === filter);
+  }, [alerts, filter]);
+
+  const activeAlert = filtered[0] || alerts[0];
+
+  const dismissOne = async (id) => {
+    const next = alerts.filter((a) => a.id !== id);
+    setAlerts(next);
+    await saveAlertHistory(next);
   };
 
-  const update = (key, value) => persist({ ...settings, [key]: value });
-
-  const sendTest = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "AquaTrack Test Alert",
-        body: "Hydration reminder is working.",
-      },
-      trigger: null,
-    });
+  const clearAll = async () => {
+    setAlerts([]);
+    await saveAlertHistory([]);
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <ToggleRow label="Enable Alerts" value={settings.enabled} onValueChange={(v) => update("enabled", v)} />
-      <ToggleRow label="High Risk Alert (>= 0.65)" value={settings.highRiskAlert} onValueChange={(v) => update("highRiskAlert", v)} />
-      <ToggleRow label="Rising Trend Warning" value={settings.risingTrend} onValueChange={(v) => update("risingTrend", v)} />
-      <ToggleRow label="Daily Reminder" value={settings.dailyReminder} onValueChange={(v) => update("dailyReminder", v)} />
-      <ToggleRow label="Morning Check-in" value={settings.morningCheckIn} onValueChange={(v) => update("morningCheckIn", v)} />
-
-      <View style={styles.card}>
-        <Text style={styles.title}>Risk Threshold: {settings.threshold.toFixed(2)}</Text>
-        <Slider
-          minimumValue={0.3}
-          maximumValue={0.9}
-          step={0.01}
-          value={settings.threshold}
-          minimumTrackTintColor={theme.colors.cyan}
-          maximumTrackTintColor={theme.colors.inactive}
-          thumbTintColor={theme.colors.cyan}
-          onValueChange={(v) => update("threshold", v)}
-        />
+    <View style={styles.container}>
+      <View style={[styles.activeCard, { backgroundColor: colorByLevel[activeAlert?.level] || theme.colors.card }]}>
+        <Text style={styles.activeTitle}>{activeAlert ? `${activeAlert.level.toUpperCase()} ALERT` : "No active alerts"}</Text>
+        {activeAlert ? (
+          <>
+            <Text style={styles.activeMsg}>{activeAlert.message}</Text>
+            <Text style={styles.activeMeta}>{new Date(activeAlert.createdAt).toLocaleString()}</Text>
+          </>
+        ) : (
+          <Text style={styles.activeMeta}>Save predictions to generate alerts.</Text>
+        )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.title}>Daily Reminder Time</Text>
-        <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
-          <Text style={styles.timeText}>{new Date(settings.reminderTime).toLocaleTimeString()}</Text>
-        </TouchableOpacity>
-        {showTimePicker ? (
-          <DateTimePicker
-            mode="time"
-            value={new Date(settings.reminderTime)}
-            display={Platform.OS === "ios" ? "spinner" : "default"}
-            onChange={(_, date) => {
-              if (date) update("reminderTime", date.toISOString());
-              if (Platform.OS !== "ios") setShowTimePicker(false);
-            }}
-          />
-        ) : null}
+      <View style={styles.tabs}>
+        {["all", "critical", "warning", "info"].map((tab) => (
+          <TouchableOpacity key={tab} style={[styles.tab, filter === tab && styles.tabOn]} onPress={() => setFilter(tab)}>
+            <Text style={[styles.tabText, filter === tab && styles.tabTextOn]}>{tab[0].toUpperCase() + tab.slice(1)}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <TouchableOpacity style={styles.testButton} onPress={sendTest}>
-        <Text style={styles.testText}>Test Notification</Text>
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        ListEmptyComponent={<Text style={styles.empty}>No alerts in this filter.</Text>}
+        renderItem={({ item }) => (
+          <Swipeable
+            renderRightActions={() => (
+              <RectButton style={styles.deleteAction} onPress={() => dismissOne(item.id)}>
+                <Text style={styles.deleteText}>Dismiss</Text>
+              </RectButton>
+            )}
+          >
+            <View style={styles.row}>
+              <Text style={styles.icon}>{item.level === "critical" ? "⛔" : item.level === "warning" ? "⚠️" : "ℹ️"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowMessage}>{item.message}</Text>
+                <Text style={styles.rowMeta}>
+                  {timeAgo(item.createdAt)} - {Math.round(Number(item.score || 0) * 100)}%
+                </Text>
+              </View>
+            </View>
+          </Swipeable>
+        )}
+      />
+
+      <TouchableOpacity style={styles.clearBtn} onPress={clearAll}>
+        <Text style={styles.clearTxt}>Clear All</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
+function timeAgo(dateString) {
+  const diff = Date.now() - new Date(dateString).getTime();
+  const mins = Math.max(1, Math.floor(diff / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: 16, paddingBottom: 36, gap: 10 },
-  row: { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  rowLabel: { color: theme.colors.text, fontFamily: theme.fonts.body, fontSize: 13 },
-  card: { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 },
-  title: { color: theme.colors.text, fontFamily: theme.fonts.bodyBold, marginBottom: 8 },
-  timeButton: { backgroundColor: theme.colors.cardAlt, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-  timeText: { color: theme.colors.cyan, fontFamily: theme.fonts.bodyBold },
-  testButton: { marginTop: 4, backgroundColor: theme.colors.cyan, borderRadius: 12, alignItems: "center", paddingVertical: 14 },
-  testText: { color: theme.colors.background, fontFamily: theme.fonts.bodyBold },
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
+  activeCard: { borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, padding: 14, marginBottom: 10 },
+  activeTitle: { color: "#fff", fontFamily: theme.fonts.bodyBold, fontSize: 14 },
+  activeMsg: { color: "#fff", fontFamily: theme.fonts.body, marginTop: 6, lineHeight: 18 },
+  activeMeta: { color: "#dbeafe", fontFamily: theme.fonts.body, marginTop: 6, fontSize: 12 },
+  tabs: { flexDirection: "row", gap: 6, marginBottom: 10 },
+  tab: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingVertical: 8, alignItems: "center" },
+  tabOn: { backgroundColor: theme.colors.cyan, borderColor: theme.colors.cyan },
+  tabText: { color: theme.colors.text, fontFamily: theme.fonts.body, fontSize: 12 },
+  tabTextOn: { color: theme.colors.background, fontFamily: theme.fonts.bodyBold },
+  row: { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 10, marginBottom: 8, flexDirection: "row", gap: 8, alignItems: "center" },
+  icon: { fontSize: 16 },
+  rowMessage: { color: theme.colors.text, fontFamily: theme.fonts.body, fontSize: 12, lineHeight: 18 },
+  rowMeta: { color: theme.colors.muted, fontFamily: theme.fonts.body, marginTop: 4, fontSize: 11 },
+  empty: { color: theme.colors.muted, fontFamily: theme.fonts.body, textAlign: "center", marginTop: 16 },
+  deleteAction: { backgroundColor: theme.colors.high, width: 90, justifyContent: "center", alignItems: "center", marginBottom: 8, borderRadius: 12 },
+  deleteText: { color: "#fff", fontFamily: theme.fonts.bodyBold },
+  clearBtn: { marginTop: 6, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
+  clearTxt: { color: theme.colors.text, fontFamily: theme.fonts.bodyBold },
 });

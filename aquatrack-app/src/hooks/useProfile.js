@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { demoProfile, USE_DEMO_SEED_DATA } from "../data/demoData";
 
-const PROFILE_KEY = "aquatrack_profile";
+const PROFILE_KEY = "userProfile";
 
 export const defaultProfile = {
   name: "",

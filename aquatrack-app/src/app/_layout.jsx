@@ -1,10 +1,13 @@
 import { Tabs } from "expo-router";
 import { useFonts } from "expo-font";
+import { useEffect } from "react";
+import * as Notifications from "expo-notifications";
 import { Syne_700Bold } from "@expo-google-fonts/syne";
 import { JetBrainsMono_400Regular, JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { handleNotificationTap, requestPermissions, scheduleReminder } from "../../app/services/notifications";
 import { theme } from "../theme";
 
 const iconByRoute = {
@@ -21,6 +24,15 @@ export default function Layout() {
     JetBrainsMono_400Regular,
     JetBrainsMono_700Bold,
   });
+
+  useEffect(() => {
+    requestPermissions();
+    scheduleReminder();
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleNotificationTap(response?.notification?.request?.content?.data);
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!loaded) {
     return (
@@ -47,7 +59,7 @@ export default function Layout() {
           ),
         })}
       >
-        <Tabs.Screen name="index" options={{ title: "Home" }} />
+        <Tabs.Screen name="index" options={{ title: "Predict" }} />
         <Tabs.Screen name="history" options={{ title: "History" }} />
         <Tabs.Screen name="profile" options={{ title: "Profile" }} />
         <Tabs.Screen name="alerts" options={{ title: "Alerts" }} />
