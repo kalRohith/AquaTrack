@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getCurrentUsername, scopedStorageKey } from "./auth";
 
 export const ALERT_HISTORY_KEY = "aquatrack_alert_history";
 const LAST_NOTIFICATION_KEY = "aquatrack_alert_last_notification";
@@ -50,12 +51,12 @@ export function buildAlertsFromHistory(history) {
 }
 
 export async function getAlertHistory() {
-  const raw = await AsyncStorage.getItem(ALERT_HISTORY_KEY);
+  const raw = await AsyncStorage.getItem(await alertHistoryKey());
   return raw ? JSON.parse(raw) : [];
 }
 
 export async function saveAlertHistory(next) {
-  await AsyncStorage.setItem(ALERT_HISTORY_KEY, JSON.stringify(next.slice(0, 30)));
+  await AsyncStorage.setItem(await alertHistoryKey(), JSON.stringify(next.slice(0, 30)));
 }
 
 export async function appendAlert(alert) {
@@ -75,14 +76,22 @@ export async function appendAlerts(alerts) {
 }
 
 export async function shouldNotifyAlert(alert) {
-  const raw = await AsyncStorage.getItem(LAST_NOTIFICATION_KEY);
+  const raw = await AsyncStorage.getItem(await lastNotificationKey());
   const state = raw ? JSON.parse(raw) : {};
   const key = `${alert.level}:${alert.message}`;
   const lastTs = Number(state[key] || 0);
   if (Date.now() - lastTs < THIRTY_MIN_MS) return false;
   const next = { ...state, [key]: Date.now() };
-  await AsyncStorage.setItem(LAST_NOTIFICATION_KEY, JSON.stringify(next));
+  await AsyncStorage.setItem(await lastNotificationKey(), JSON.stringify(next));
   return true;
+}
+
+async function alertHistoryKey() {
+  return scopedStorageKey(ALERT_HISTORY_KEY, await getCurrentUsername());
+}
+
+async function lastNotificationKey() {
+  return scopedStorageKey(LAST_NOTIFICATION_KEY, await getCurrentUsername());
 }
 
 function dedupeAlerts(list) {

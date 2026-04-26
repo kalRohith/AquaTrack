@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { demoHistory, USE_DEMO_SEED_DATA } from "../data/demoData";
+import { useAuth } from "./useAuth";
+import { scopedStorageKey } from "../services/auth";
 import { riskMeta } from "../theme";
 
 const HISTORY_KEY = "aquatrack_history";
@@ -20,29 +22,34 @@ const normalizeEntry = (entry, index) => {
 };
 
 export function useHistory() {
+  const { user } = useAuth();
+  const storageKey = scopedStorageKey(HISTORY_KEY, user?.username);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadHistory = useCallback(async () => {
-    const raw = await AsyncStorage.getItem(HISTORY_KEY);
+    if (!user?.username) return;
+    const raw = await AsyncStorage.getItem(storageKey);
     let parsed = raw ? JSON.parse(raw) : [];
     if (!parsed.length && USE_DEMO_SEED_DATA) {
       parsed = demoHistory;
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(parsed));
+      await AsyncStorage.setItem(storageKey, JSON.stringify(parsed));
     }
     const normalized = parsed.map(normalizeEntry).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     setHistory(normalized);
     setLoading(false);
-  }, []);
+  }, [storageKey, user?.username]);
 
   useEffect(() => {
+    setHistory([]);
+    setLoading(true);
     loadHistory();
   }, [loadHistory]);
 
   const persist = useCallback(async (next) => {
     setHistory(next);
-    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  }, []);
+    await AsyncStorage.setItem(storageKey, JSON.stringify(next));
+  }, [storageKey]);
 
   const deleteReading = useCallback(
     async (id) => {

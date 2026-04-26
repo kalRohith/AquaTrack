@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform } from "react-native";
 import { getBackendUrl } from "../../app/services/backendUrl";
 import { askHydrationAssistant } from "../../app/services/api";
 import { useHistory } from "../hooks/useHistory";
@@ -115,78 +115,86 @@ export default function InsightsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Personal Hydration Profile</Text>
-        <Text style={styles.tipText}>Best time of day: {sectionA.bestTime}</Text>
-        <Text style={styles.tipText}>Riskiest day: {sectionA.riskiestDay}</Text>
-        <Text style={styles.tipText}>Week vs last week: {sectionA.pct >= 0 ? "↑" : "↓"} {Math.abs(Math.round(sectionA.pct))}%</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Trend Analysis (7 Day Avg)</Text>
-        {chartPoints.map((p) => (
-          <View key={p.day} style={styles.metricRow}>
-            <Text style={styles.metricLabel}>{p.day} {p.critical ? "🔴" : ""}</Text>
-            <View style={styles.metricTrack}>
-              <View style={[styles.metricFill, { width: `${Math.max(2, p.avg * 100)}%`, backgroundColor: theme.colors.cyan }]} />
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Factor Breakdown</Text>
-        {topContrib.map(([name, value]) => (
-          <View key={name} style={styles.metricRow}>
-            <Text style={styles.metricLabel}>{name}</Text>
-            <View style={styles.metricTrack}>
-              <View style={[styles.metricFill, { width: `${Math.min(100, Math.round(value / 8))}%`, backgroundColor: theme.colors.medium }]} />
-            </View>
-          </View>
-        ))}
-        {topContrib[0] ? <Text style={styles.tipText}>Your {topContrib[0][0]} appears elevated vs typical median and may be a key risk driver.</Text> : null}
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {dynamicCards.map((tip, idx) => (
-          <View key={tip} style={[styles.tipCard, { width: 280 }]}>
-            <Text style={styles.tipTitle}>Insight {idx + 1}</Text>
-            <Text style={styles.tipText}>{tip}</Text>
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Recommendations</Text>
-        {recommendations.map((tip) => (
-          <Text key={tip} style={styles.tipText}>• {tip}</Text>
-        ))}
-        {!recommendations.length ? <Text style={styles.tipText}>Add more readings to get contextual recommendations.</Text> : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Hydration Assistant</Text>
-        {messages.map((msg, idx) => (
-          <View key={`${msg.role}-${idx}`} style={[styles.chatBubble, msg.role === "user" ? styles.userBubble : styles.botBubble]}>
-            <Text style={styles.tipText}>{msg.role === "bot" ? `💧 ${msg.text}` : msg.text}</Text>
-          </View>
-        ))}
-        <View style={styles.chatRow}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            style={styles.chatInput}
-            placeholder="Ask about hydration, dehydration, electrolytes..."
-            placeholderTextColor={theme.colors.muted}
-          />
-          <TouchableOpacity style={styles.chatSend} onPress={send} disabled={sending}>
-            <Text style={styles.chatSendTxt}>{sending ? "..." : "Send"}</Text>
-          </TouchableOpacity>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"} 
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Personal Hydration Profile</Text>
+          <Text style={styles.tipText}>Best time of day: {sectionA.bestTime}</Text>
+          <Text style={styles.tipText}>Riskiest day: {sectionA.riskiestDay}</Text>
+          <Text style={styles.tipText}>Week vs last week: {sectionA.pct >= 0 ? "↑" : "↓"} {Math.abs(Math.round(sectionA.pct))}%</Text>
         </View>
-        {chatError ? <Text style={styles.chatError}>{chatError}</Text> : null}
-      </View>
-    </ScrollView>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Trend Analysis (7 Day Avg)</Text>
+          {chartPoints.map((p) => (
+            <View key={p.day} style={styles.metricRow}>
+              <Text style={styles.metricLabel}>{p.day} {p.critical ? "🔴" : ""}</Text>
+              <View style={styles.metricTrack}>
+                <View style={[styles.metricFill, { width: `${Math.max(2, p.avg * 100)}%`, backgroundColor: theme.colors.cyan }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Factor Breakdown</Text>
+          {topContrib.map(([name, value]) => (
+            <View key={name} style={styles.metricRow}>
+              <Text style={styles.metricLabel}>{name}</Text>
+              <View style={styles.metricTrack}>
+                <View style={[styles.metricFill, { width: `${Math.min(100, Math.round(value / 8))}%`, backgroundColor: theme.colors.medium }]} />
+              </View>
+            </View>
+          ))}
+          {topContrib[0] ? <Text style={styles.tipText}>Your {topContrib[0][0]} appears elevated vs typical median and may be a key risk driver.</Text> : null}
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+          {dynamicCards.map((tip, idx) => (
+            <View key={tip} style={[styles.tipCard, { width: 280 }]}>
+              <Text style={styles.tipTitle}>Insight {idx + 1}</Text>
+              <Text style={styles.tipText}>{tip}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Recommendations</Text>
+          {recommendations.map((tip) => (
+            <Text key={tip} style={styles.tipText}>• {tip}</Text>
+          ))}
+          {!recommendations.length ? <Text style={styles.tipText}>Add more readings to get contextual recommendations.</Text> : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Hydration Assistant</Text>
+          {messages.map((msg, idx) => (
+            <View key={`${msg.role}-${idx}`} style={[styles.chatBubble, msg.role === "user" ? styles.userBubble : styles.botBubble]}>
+              <Text style={styles.tipText}>{msg.role === "bot" ? `💧 ${msg.text}` : msg.text}</Text>
+            </View>
+          ))}
+          <View style={styles.chatRow}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              style={styles.chatInput}
+              placeholder="Ask about hydration, electrolytes..."
+              placeholderTextColor={theme.colors.muted}
+              multiline
+              numberOfLines={3}
+            />
+            <TouchableOpacity style={styles.chatSend} onPress={send} disabled={sending}>
+              <Text style={styles.chatSendTxt}>{sending ? "..." : "Send"}</Text>
+            </TouchableOpacity>
+          </View>
+          {chatError ? <Text style={styles.chatError}>{chatError}</Text> : null}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -270,9 +278,9 @@ const styles = StyleSheet.create({
   chatBubble: { borderRadius: 10, padding: 8, marginBottom: 8 },
   userBubble: { backgroundColor: theme.colors.cyan },
   botBubble: { backgroundColor: theme.colors.cardAlt, borderWidth: 1, borderColor: theme.colors.border },
-  chatRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  chatInput: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, color: theme.colors.text, fontFamily: theme.fonts.body, backgroundColor: theme.colors.cardAlt },
-  chatSend: { backgroundColor: theme.colors.cyan, borderRadius: 10, justifyContent: "center", paddingHorizontal: 14 },
+  chatRow: { flexDirection: "row", gap: 8, marginTop: 8, alignItems: "flex-end" },
+  chatInput: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12, color: theme.colors.text, fontFamily: theme.fonts.body, backgroundColor: theme.colors.cardAlt, minHeight: 60, fontSize: 15 },
+  chatSend: { backgroundColor: theme.colors.cyan, borderRadius: 10, justifyContent: "center", paddingHorizontal: 14, height: 60 },
   chatSendTxt: { color: theme.colors.background, fontFamily: theme.fonts.bodyBold },
   chatError: { color: theme.colors.medium, fontFamily: theme.fonts.body, marginTop: 6, fontSize: 12 },
 });

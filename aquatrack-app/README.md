@@ -43,8 +43,19 @@ Scan the QR code with Expo Go on iPhone.
 
 ## Backend URL
 
-Default URL: `http://localhost:8000`  
-Change it in **Settings** when testing on device or remote backend.
+Default URL: `http://localhost:8000`
+
+When running on a physical phone with Expo Go, start FastAPI on all interfaces:
+
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+The app will use the Expo LAN host automatically when available. If Expo is running through a tunnel or reports `localhost`, set a reachable API URL before starting Expo:
+
+```bash
+EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_LAN_IP:8000 npx expo start
+```
 
 ## Notes
 

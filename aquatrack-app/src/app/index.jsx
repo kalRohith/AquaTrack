@@ -44,6 +44,25 @@ const medianKeyMap = {
   leftLeg: "left_leg",
 };
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function localScore(nextForm, medians, keys) {
+  const deviations = keys
+    .map((key) => {
+      const current = Number(nextForm[key]);
+      const base = Number(medians[medianKeyMap[key]]);
+      if (!Number.isFinite(current) || !Number.isFinite(base)) return null;
+      return Math.abs(current - base) / Math.max(Math.abs(base), 1);
+    })
+    .filter((v) => v !== null);
+
+  if (!deviations.length) return 0;
+  const avgDev = deviations.reduce((a, b) => a + b, 0) / deviations.length;
+  return clamp01(Number((avgDev / (1 + avgDev)).toFixed(3)));
+}
+
 function FieldInput({ fieldKey, value, estimated, error, onChange }) {
   const meta = FIELD_META[fieldKey];
   return (
@@ -131,8 +150,9 @@ export default function PredictScreen() {
     const { isValid, nextForm } = validateAndFill();
     if (!isValid) return;
     setSaving(true);
+    let backendUrl = "";
     try {
-      const backendUrl = await getBackendUrl();
+      backendUrl = await getBackendUrl();
       const response = await predictAll({ backendUrl, input: nextForm });
       const mainScore = Number(response?.main?.score ?? response?.main?.prediction ?? response?.main?.risk ?? 0);
       const contextScore = Number(response?.context?.score ?? response?.context?.prediction ?? response?.context?.risk ?? 0);
@@ -156,7 +176,42 @@ export default function PredictScreen() {
         input: nextForm,
       });
     } catch (err) {
-      setRequestError("Could not reach the model API. Ensure FastAPI is running and your phone/emulator is on the same WiFi.");
+      const mainScore = localScore(nextForm, medians, [
+        "sweatChloride",
+        "sweatOsmolality",
+        "salivaryOsmolality",
+        "salivaryChloride",
+        "salivaryAmylase",
+        "salivaryProtein",
+        "salivaryCortisol",
+        "salivaryCortisone",
+        "salivaryPotassium",
+        "runningSpeed",
+        "runningInterval",
+        "totalBodyWater",
+        "inbodyWeight",
+      ]);
+      const contextScore = localScore(nextForm, medians, ["skinTemperature", "skinConductance", "tewl", "ambientTemperature", "ambientHumidity", "rightArm", "leftArm", "trunk", "rightLeg", "leftLeg"]);
+      const fusionScore = Number((0.6 * mainScore + 0.4 * contextScore).toFixed(3));
+      const delta = Math.abs(mainScore - contextScore);
+      const contributions = Object.keys(medianKeyMap)
+        .map((key) => {
+          const base = Number(medians[medianKeyMap[key]] || 1);
+          const current = Number(nextForm[key] || 0);
+          return { key, val: Math.abs(current - base) / Math.max(Math.abs(base), 1) };
+        })
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 3);
+      setResult({
+        mainScore,
+        contextScore,
+        fusionScore,
+        riskLabel: riskMeta(fusionScore).label,
+        consistent: delta < 0.18,
+        contributions,
+        input: nextForm,
+      });
+      setRequestError(`API unavailable at ${backendUrl || "configured URL"}. Showing local estimate.`);
     } finally {
       setSaving(false);
     }

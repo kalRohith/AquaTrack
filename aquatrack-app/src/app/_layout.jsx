@@ -7,6 +7,8 @@ import { JetBrainsMono_400Regular, JetBrainsMono_700Bold } from "@expo-google-fo
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AuthScreen from "../components/AuthScreen";
+import { AuthProvider, useAuth } from "../hooks/useAuth";
 import { handleNotificationTap, requestPermissions, scheduleReminder } from "../../app/services/notifications";
 import { theme } from "../theme";
 
@@ -19,11 +21,20 @@ const iconByRoute = {
 };
 
 export default function Layout() {
+  return (
+    <AuthProvider>
+      <AuthedLayout />
+    </AuthProvider>
+  );
+}
+
+function AuthedLayout() {
   const [loaded] = useFonts({
     Syne_700Bold,
     JetBrainsMono_400Regular,
     JetBrainsMono_700Bold,
   });
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     requestPermissions();
@@ -34,12 +45,16 @@ export default function Layout() {
     return () => sub.remove();
   }, []);
 
-  if (!loaded) {
+  if (!loaded || loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={theme.colors.cyan} />
       </View>
     );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
   }
 
   return (

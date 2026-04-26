@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { DEFAULT_BACKEND_URL } from "../constants/endpoints";
 
 const HISTORY_KEY = "aquatrack_history_v1";
 const SETTINGS_KEY = "aquatrack_settings_v1";
@@ -7,7 +8,7 @@ const ONBOARDING_KEY = "aquatrack_seen_onboarding_v1";
 
 const defaultSettings = {
   profileName: "",
-  backendUrl: "http://localhost:8000",
+  backendUrl: DEFAULT_BACKEND_URL,
   faceIdEnabled: false,
   units: "metric",
   modelVersion: "AquaTrack v1",
